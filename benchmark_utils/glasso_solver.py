@@ -16,6 +16,7 @@ class GraphicalLasso():
                  alpha=1.,
                  weights=None,
                  algo="dual",
+                 pen="l1",
                  inner_anderson=False,
                  outer_anderson=False,
                  max_iter=100,
@@ -26,6 +27,7 @@ class GraphicalLasso():
         self.alpha = alpha
         self.weights = weights
         self.algo = algo
+        self.pen = pen,
         self.inner_anderson = inner_anderson
         self.outer_anderson = outer_anderson
         self.max_iter = max_iter
@@ -110,6 +112,7 @@ class GraphicalLasso():
                     x=beta_init,
                     alpha=self.alpha,
                     weights=Weights[indices != col, col],
+                    pen=self.pen,
                     anderson=self.inner_anderson,
                     anderson_buffer=4,
                     tol=self.inner_tol,
@@ -187,11 +190,125 @@ class GraphicalLasso():
 
 @njit
 def ST(x, tau):
+    """ Prox of ell_1 penalty """
     return np.sign(x) * np.maximum(np.abs(x) - tau, 0)
 
 
 @njit
-def cd_gram(H, q, x, alpha, weights, anderson=False, anderson_buffer=0, max_iter=100, tol=1e-4):
+def prox_MCP(v, lambd, gamma):
+    scale = 1.0 / (1.0 - 1.0 / gamma)
+    if isinstance(v, float) or isinstance(v, int):
+        abs_v = abs(v)
+        if abs_v <= lambd:
+            return 0.0
+        elif abs_v <= gamma * lambd:
+            return scale * np.sign(v) * (abs_v - lambd)
+        else:
+            return v
+    else:
+        prox = np.empty_like(v)
+        for i in range(v.shape[0]):
+            abs_vi = abs(v[i])
+            if abs_vi <= lambd:
+                prox[i] = 0.0
+            elif abs_vi <= gamma * lambd:
+                prox[i] = scale * np.sign(v[i]) * (abs_vi - lambd)
+            else:
+                prox[i] = v[i]
+        return prox
+
+
+@njit
+def prox_SCAD(v, lambd, gamma=3.7, eta=1.0):
+    scale = 1.0 / (1.0 - eta / (gamma - 1))
+
+    if isinstance(v, float) or isinstance(v, int):
+        abs_v = abs(v)
+        sign_v = 1.0 if v >= 0 else -1.0
+
+        if abs_v <= lambd:
+            return 0.0
+        elif abs_v <= gamma * lambd:
+            return sign_v * (abs_v - eta * lambd) * scale
+        else:
+            return v
+    else:
+        prox = np.empty_like(v)
+        for i in range(v.shape[0]):
+            abs_vi = abs(v[i])
+            sign_vi = 1.0 if v[i] >= 0 else -1.0
+
+            if abs_vi <= lambd:
+                prox[i] = 0.0
+            elif abs_vi <= gamma * lambd:
+                prox[i] = sign_vi * (abs_vi - eta * lambd) * scale
+            else:
+                prox[i] = v[i]
+        return prox
+
+
+@njit
+def prox_l_05(x, u):
+    t = (3./2.) * u ** (2./3.)
+    if np.abs(x) < t:
+        return 0.
+    return x * (2./3.) * (1 + np.cos((2./3.) * np.arccos(
+        -(3.**(3./2.)/4.) * u * np.abs(x)**(-3./2.))))
+
+
+@njit
+def _r2(x, alpha, eps):
+    # compute r2 as in (eq. 7), ref [1] in `prox_log_sum`
+    return (x - eps) / 2. + np.sqrt(((x + eps) ** 2) / 4 - alpha)
+
+
+@njit
+def _log_sum_prox_val(x, z, alpha, eps):
+    # prox objective of log-sum `log(1 + abs(x) / eps)`
+    return ((x - z) ** 2) / (2 * alpha) + np.log1p(np.abs(x) / eps)
+
+
+@njit
+def _r(x, alpha, eps):
+    # compute r as defined in (eq. 9), ref [1] in `prox_log_sum`
+    r_z = _log_sum_prox_val(_r2(x, alpha, eps), x, alpha, eps)
+    r_0 = _log_sum_prox_val(0, x, alpha, eps)
+    return r_z - r_0
+
+
+@njit
+def _find_root_by_bisection(a, b, alpha, eps, tol=1e-8):
+    # find root of function func in interval [a, b] by bisection."""
+    while b - a > tol:
+        c = (a + b) / 2.
+        if _r(a, alpha, eps) * _r(c, alpha, eps) < 0:
+            b = c
+        else:
+            a = c
+    return c
+
+
+@njit
+def prox_log_sum(x, alpha, eps):
+    if np.sqrt(alpha) <= eps:
+        if abs(x) <= alpha / eps:
+            return 0.
+        else:
+            return np.sign(x) * _r2(abs(x), alpha, eps)
+    else:
+        a = 2 * np.sqrt(alpha) - eps
+        b = alpha / eps
+        # f is continuous and f(a) * f(b) < 0, the root can be found by bisection
+        x_star = _find_root_by_bisection(a, b, alpha, eps)
+        if abs(x) <= x_star:
+            return 0.
+        else:
+            return np.sign(x) * _r2(abs(x), alpha, eps)
+
+
+@njit
+def cd_gram(H, q, x, alpha, weights, pen="l1",
+            anderson=False, anderson_buffer=0, max_iter=100, tol=1e-4):
     """
     Solve min .5 * x.T H x + q.T @ x + alpha * norm(x, 1) with(out) extrapolation.
 
@@ -214,8 +331,30 @@ def cd_gram(H, q, x, alpha, weights, anderson=False, anderson_buffer=0, max_iter
 
         for j in range(dim):
             x_j_prev = x[j]
-            x[j] = ST(x[j] - (Hx[j] + q[j]) / lc[j],
-                      alpha*weights[j] / lc[j])
+            if pen[0] == "l1":
+                x[j] = ST(x[j] - (Hx[j] + q[j]) / lc[j],
+                          alpha*weights[j] / lc[j])
+
+            elif pen[0] == "mcp":
+                gamma = 3.
+                x[j] = prox_MCP(x[j] - (Hx[j] + q[j]) / lc[j],
+                                alpha*weights[j] / lc[j], gamma)
+
+            elif pen[0] == "scad":
+                x[j] = prox_SCAD(x[j] - (Hx[j] + q[j]) / lc[j],
+                                 alpha*weights[j] / lc[j], gamma)
+
+            elif pen[0] == "sqrt":
+                x[j] = prox_l_05(x[j] - (Hx[j] + q[j]) / lc[j],
+                                 alpha*weights[j] / lc[j])
+
+            elif pen[0] == "log":
+                eps = 1.
+                x[j] = prox_log_sum(x[j] - (Hx[j] + q[j]) / lc[j],
+                                    alpha*weights[j] / lc[j], eps=eps)
+
+            else:
+                print("Unknown penalty")
 
             max_delta = max(max_delta, np.abs(x_j_prev - x[j]))
 

@@ -13,7 +13,7 @@ class Objective(BaseObjective):
 
     # alpha is the regularization hyperparameter
     parameters = {
-        'reg': [0.1],
+        'reg': [0.5],
     }
 
     requirements = ["numpy", "scikit-learn", "numba"]

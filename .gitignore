@@ -20,6 +20,14 @@ coverage.xml
 
 /functional_connectivity/
 /benchmark_utils/skggm/
-# /benchmark_utils/GLASSO_Framework/
 /benchmark_utils/py_bigquic/
+/
 
+tmp.py
+verify_animals_non_spd.py
+reg_path_old.py
+reg_path_results/*
+reg_path_results
+fast_reweights.py
+plot_penalties.py
+plot_prox.py
