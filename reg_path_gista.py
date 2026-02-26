@@ -6,13 +6,20 @@ from sklearn.datasets import make_sparse_spd_matrix
 from sklearn.utils import check_random_state
 
 from benchmark_utils import GraphicalLasso
-from benchmark_utils import AdaptiveGraphicalLasso
+from benchmark_utils import gista_solver
+from benchmark_utils import AdaptiveGistaSolver
+import time
+import pandas as pd
+import argparse
+
 
 data_type = "synthetic"
-# data_type = "animals"
+parser = argparse.ArgumentParser()
+parser.add_argument("--max_iter_reweights", type=int, default = 10)
+args = parser.parse_args()
 
-
-def synthetic_data(p=100, n=1000, alpha=0.9):
+max_iter_reweights = args.max_iter_reweights
+def synthetic_data(p=50, n=1000, alpha=0.9):
     rng = check_random_state(0)
     Theta_true = make_sparse_spd_matrix(
         p,
@@ -39,125 +46,92 @@ def synthetic_data(p=100, n=1000, alpha=0.9):
 
     return alpha_max, S_train, S_test, Theta_true
 
+# Synthetic data parameters
+p = 75
+n = 1000
+sparsity = 0.9
 
-def animals_data():
-    X = np.loadtxt('./data/animals.txt', delimiter=',').T
+# Grid search parameters
+smallest_alpha_scaler = 1e-3
+grid_size = 20
+number_of_runs = 8
 
-    train_size = int(2 * X.shape[0] / 3)
-    X_train = X[:train_size]
-    X_test = X[train_size:]
+# Generate synthetic data
+alpha_max, S_train, S_test, Theta_true = synthetic_data(p=p, n=n, alpha=sparsity)
+alphas = alpha_max*np.geomspace(1, smallest_alpha_scaler, num=grid_size)
 
-    X = X-X.mean(0)
-
-    S_train = np.cov(X_train, bias=True, rowvar=False)
-    S_cpy = np.copy(S_train)
-    np.fill_diagonal(S_cpy, 0.)
-    alpha_max = 2*np.max(np.abs(S_cpy))
-
-    S_test = np.cov(X_test, bias=True, rowvar=False)
-
-    return alpha_max, S_train, S_test, X_train.shape[1], train_size
-
-
-if data_type == "synthetic":
-    p = 100
-    n = 1000
-    sparsity = 0.9
-
-    smallest_alpha_scaler = 1e-3
-
-    grid_size = 30
-    # grid_size = 5
-
-    alpha_max, S_train, S_test, Theta_true = synthetic_data(p=p, n=n, alpha=sparsity)
-
-    alphas = alpha_max*np.geomspace(1, smallest_alpha_scaler, num=grid_size)
-
-elif data_type == "animals":
-    alpha_max, S_train, S_test, p, n = animals_data()
-
-    smallest_alpha_scaler = 1e-3
-
-    sparsity = "Unknown"
-
-    alphas = 5*alpha_max*np.geomspace(1, smallest_alpha_scaler, num=30)
-
-else:
-    raise "Unknown data type"
+# Number of reweights
+n_reweights = 20
 
 penalties = [
-    "L1",
-    "MCP",
-    "SCAD",
-    "L0_5",
-    "Log",
+    # "L1",
+    # "MCP",
+    # "SCAD",
+    # "L0_5",
+    # "Log",
 
     "L1_",
     "R-Log",
     "R-MCP",
-    "R-SCAD",
+    # "R-SCAD",
     "R-L0.5",
 ]
 
-n_reweights = 20
 
 models_tol = 1e-4
 models = [
-    GraphicalLasso(algo="primal",
-                   pen="l1",
-                   warm_start=True,
-                   tol=models_tol),
+    # GraphicalLasso(algo="primal",
+    #                pen="l1",
+    #                warm_start=True,
+    #                tol=models_tol),
 
-    GraphicalLasso(algo="primal",
-                   pen="mcp",
-                   warm_start=True,
-                   tol=models_tol),
+    # GraphicalLasso(algo="primal",
+    #                pen="mcp",
+    #                warm_start=True,
+    #                tol=models_tol),
 
-    GraphicalLasso(algo="primal",
-                   pen="scad",
-                   warm_start=True,
-                   tol=models_tol),
+    # GraphicalLasso(algo="primal",
+    #                pen="scad",
+    #                warm_start=True,
+    #                tol=models_tol),
 
-    GraphicalLasso(algo="primal",
-                   pen="sqrt",
-                   warm_start=True,
-                   tol=models_tol),
+    # GraphicalLasso(algo="primal",
+    #                pen="sqrt",
+    #                warm_start=True,
+    #                tol=models_tol),
 
-    GraphicalLasso(algo="primal",
-                   pen="log",
-                   warm_start=True,
-                   tol=models_tol),
+    # GraphicalLasso(algo="primal",
+    #                pen="log",
+    #                warm_start=True,
+    #                tol=models_tol),
     #####
     GraphicalLasso(algo="primal",
                    pen="l1",
                    warm_start=True,
                    tol=models_tol),
 
-    AdaptiveGraphicalLasso(warm_start=True,
-                           strategy="log",
+    AdaptiveGistaSolver(strategy="log",
                            n_reweights=n_reweights,
                            tol=models_tol,
-                           max_iter=100),
+                           max_iter=max_iter_reweights),
 
-    AdaptiveGraphicalLasso(warm_start=True,
-                           strategy="mcp",
+    AdaptiveGistaSolver(strategy="mcp",
                            n_reweights=n_reweights,
                            tol=models_tol,
-                           max_iter=100),
+                           max_iter=max_iter_reweights),
 
-    AdaptiveGraphicalLasso(warm_start=True,
-                           strategy="scad",
-                           n_reweights=n_reweights,
-                           tol=models_tol,
-                           max_iter=100),
+    # AdaptiveGistaSolver(strategy="scad",
+    #                        n_reweights=n_reweights,
+    #                        tol=models_tol,
+    #                        max_iter=max_iter_reweights),
 
-    AdaptiveGraphicalLasso(warm_start=True,
-                           strategy="sqrt",
+    AdaptiveGistaSolver(strategy="sqrt",
                            n_reweights=n_reweights,
                            tol=models_tol,
-                           max_iter=100),
+                           max_iter=max_iter_reweights),
 ]
 
+glasso_fit_times = {penalty: [] for penalty in penalties}
 glasso_nmses = {penalty: [] for penalty in penalties}
 glasso_f1_scores = {penalty: [] for penalty in penalties}
 glasso_holdout_llhs = {penalty: [] for penalty in penalties}
@@ -170,18 +144,26 @@ for i, (penalty, model) in enumerate(zip(penalties, models)):
         print(f"======= alpha {alpha_idx+1}/{len(alphas)} =======")
 
         model.alpha = alpha
-        model.fit(S_train)
+        fit_times = []
+        for k in range(number_of_runs):
+            t0 = time.perf_counter()
+            model.fit(S_train)
+            t1 = time.perf_counter()
+            fit_times.append(t1-t0)
 
         Theta = model.precision_
 
         if data_type == "synthetic":
+            med_run_time = np.median(fit_times[1:])
             nmse = norm(Theta - Theta_true)**2 / norm(Theta_true)**2
             f1 = f1_score(Theta.flatten() != 0.,
                           Theta_true.flatten() != 0.)
             print(f"NMSE: {nmse:.3f}")
             print(f"F1  : {f1:.3f}")
+            print(f"Median run time : {med_run_time}")
             glasso_nmses[penalty].append(nmse)
             glasso_f1_scores[penalty].append(f1)
+            glasso_fit_times[penalty].append(med_run_time)
 
         else:
             sparsity_degree = 1 - (np.count_nonzero(Theta) - p) / (p**2)
@@ -193,14 +175,14 @@ for i, (penalty, model) in enumerate(zip(penalties, models)):
 
 plt.close('all')
 if data_type == "synthetic":
-    fig, ax = plt.subplots(3, 2, sharex=True,
+    fig, ax = plt.subplots(4, 2, sharex=True,
                            figsize=([9.7, 8.29]),
                            layout="constrained")
 else:
     fig, ax = plt.subplots(2, 2, sharex=True,
                            figsize=([8.22, 6.85]),
                            layout="constrained")
-
+csv_rows= []
 for i, penalty in enumerate(penalties):
 
     if penalty[:2] == "L1":
@@ -302,7 +284,40 @@ for i, penalty in enumerate(penalties):
             alpha=0.5,
             markersize=12,
             color=color)
-
+        # Median run times
+        ax[3, col].semilogx(alphas/alpha_max,
+                            glasso_fit_times[penalty],
+                            linewidth=2.,
+                            color=color,
+                            linestyle=linestyle)
+        min_time = np.argmin(glasso_fit_times[penalty])
+        ax[3, col].vlines(
+            x=alphas[min_time] / alphas[0],
+            ymin=0,
+            ymax=np.max(glasso_fit_times[penalty]),
+            linestyle="dotted",
+            alpha=0.5,
+            color=color)
+        line1 = ax[3, col].plot(
+            [alphas[min_time] / alphas[0]],
+            0,
+            clip_on=False,
+            marker=marker,
+            alpha=0.5,
+            markersize=12,
+            color=color)
+        csv_rows.append({
+            "penalty": penalty,
+            "llh_run_time": float(glasso_fit_times[penalty][int(max_llh)]),
+            "max_llh": float(glasso_holdout_llhs[penalty][int(max_llh)]),
+            "lambda_at_max_llh": float(alphas[int(max_llh)]),
+            "mmse_run_time": float(glasso_fit_times[penalty][int(min_nmse)]),
+            "min_nmse": float(glasso_nmses[penalty][int(min_nmse)]),
+            "lambda_at_min_nmse": float(alphas[int(min_nmse)]),
+            "f1_score_run_time": float(glasso_fit_times[penalty][int(max_f1)]),
+            "max_f1": float(glasso_f1_scores[penalty][int(max_f1)]),
+            "lambda_at_max_f1_score": float(alphas[int(max_f1)]),
+        })
     elif data_type == "animals":
         col = 1 if ((penalty[0] == "R") or (penalty == "L1_")) else 0
 
@@ -386,8 +401,9 @@ elif data_type == "animals":
         f"Sparsity degree", fontsize=12)
 
 plt.savefig(
-    f"./reg_path_results/p{p}_n{n}_alpha{sparsity}_{data_type}_corrected_again.pdf")
-plt.show()
+    f"./bench_results/gista/p{p}_n{n}_alpha{sparsity}_{data_type}_max_iter_reweights_{max_iter_reweights}_gridsize_{grid_size}_.pdf")
+plt.show(block=False)
+pd.DataFrame(csv_rows).to_csv(f"./bench_results/gista/p{p}_n{n}_alpha{sparsity}_{data_type}_max_iter_reweights_{max_iter_reweights}_gridsize_{grid_size}_glasso_summary.csv", index=False)
 
 for penalty in penalties:
     f1_at_optimal_heldout = glasso_f1_scores[penalty][np.argmax(
@@ -405,6 +421,3 @@ for penalty in penalties:
 to_save = [glasso_nmses,
            glasso_f1_scores,
            glasso_holdout_llhs]
-
-for i, elem in enumerate(to_save):
-    np.save(f"./reg_path_results/p{p}_{i}_{data_type}_corrected_again.npy", elem)

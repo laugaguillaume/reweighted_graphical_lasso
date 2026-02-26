@@ -6,6 +6,8 @@
 
 from .glasso_solver import GraphicalLasso
 from .adaptive_glasso_solver import AdaptiveGraphicalLasso
+from .adaptive_quic_solver import AdaptiveQuicSolver
+from .adaptive_gista_solver import AdaptiveGistaSolver
 from .skggm.inverse_covariance import QuicGraphicalLasso
 from .gista_solver import GraphicalIsta
 from .OBN.algos.OBN import OBN

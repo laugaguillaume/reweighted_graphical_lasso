@@ -1,16 +1,17 @@
 
-A Graphical Lasso Benchmark
+Accelerating non-convex graphical Lasso
 =====================
 |Build Status| |Python 3.6+|
 
-Benchopt is a package to simplify and make more transparent and
-reproducible comparisons of optimization methods.
-This benchmark is dedicated to solvers of the Graphical Lasso estimator (Banerjee et al., 2008):
+This code is a fork of https://github.com/Perceptronium/benchmark_graphical_lasso to compare acceleration of the solving of non-convex graphical Lasso formulation using the framework developed in https://arxiv.org/abs/2601.21467. 
 
+This repository runs three solvers to solve the non-convex Graphical Lasso estimator (Banerjee et al., 2008):
 
-$$\\min_{\\Theta \\succ 0} - \\log \\det (\\Theta) + \\langle \\Theta, S \\rangle + \\alpha \\Vert \\Theta \\Vert_{1,\\mathrm{off}},$$
+$$\\min_{\\Theta \\succ 0} - \\log \\det (\\Theta) + \\langle \\Theta, S \\rangle + \\alpha \sum_{i,j=1}^d \\phi_{i,j}\\left(|[\\Theta}]^{(i,j)}|\\right),$$
 
-where $\\Theta$ is the optimization variable, $S$ is the empirical covariance matrix and $\\alpha$ is the regularization hyperparameter.
+where $\\Theta$ is the optimization variable, $S$ is the empirical covariance matrix, $\\alpha$ is the regularization hyperparameter and $\\phi_{i,j}$ encodes a block-wise non-convex penalty.
+
+The three solvers are Graphical ISTA (Rolfs et al., 2012), QUIC (Hsieh et al., 2014) and Primal GLasso (Mazumder et al., 2012). 
 
 Install
 --------
@@ -27,14 +28,12 @@ This benchmark can be run using the following commands, which first create a ded
    $ git clone https://github.com/skggm/skggm ./benchmark_graphical_lasso/benchmark_utils/skggm
    $ pip install Cython
    $ pip install -e ./benchmark_graphical_lasso/benchmark_utils/skggm/
-   $ benchopt run ./benchmark_graphical_lasso --config ./benchmark_graphical_lasso/simple_conf.yml
+   $ bash execute_all_reweights.sh
+   $ bash execute_all_plots.sh
 
+execute_all_reweights.sh computes 1, 2, 3, 4, 5, 10, or 100 iterations per reweighting (20 reweighting in total) for each solver. Then all the plots of the article are created by execute_all_plots.sh
 
-Please visit https://benchopt.github.io/ for more details on using the `benchopt` ecosystem.
-
-.. image:: bench_fig.jpg
-   :width: 350
-   :align: center
+Please refer to https://github.com/Perceptronium/benchmark_graphical_lasso for a thorough benchmark of solvers.
 
 .. |Build Status| image:: https://github.com/Perceptronium/benchmark_graphical_lasso/actoiworkflows/main.yml/badge.svg
    :target: https://github.com/Perceptronium/benchmark_graphical_lasso/actions

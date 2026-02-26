@@ -32,8 +32,7 @@ class Solver(BaseSolver):
 
         self.model.max_iter = n_iter
         self.model.fit(self.X)
-
         self.Theta = self.model.precision_
-
+        self.W = self.model.covariance_
     def get_result(self):
-        return dict(Theta=self.Theta)
+        return dict(Theta=self.Theta,W = self.W)

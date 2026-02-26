@@ -1,4 +1,4 @@
-from benchopt.utils import safe_import_context
+from benchopt.utils.safe_import import safe_import_context
 
 with safe_import_context() as import_ctx:
     import numpy as np

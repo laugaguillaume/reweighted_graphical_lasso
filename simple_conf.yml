@@ -6,13 +6,14 @@ solver:
   # - skglm[algo=dual, inner_anderson=False, outer_anderson=False]
   # - skglm[algo=primal, inner_anderson=False, outer_anderson=False]
   - sklearn
-  # - gglasso
-  # - skggm
+  - gglasso
+  - skggm
   # - obn
 dataset:
   # - simulated[n_samples=1000,n_features=[50,100,200]]
   # - simulated[n_samples=1000,n_features=[50, 100],sparsity_controller=[0.9,0.5]]
-  - animals
+  # - animals
+  - simulated[n_samples = 1000, n_features = [50]]
 n-repetitions: 10
 
 # benchopt run . --config ./simple_conf.yml
