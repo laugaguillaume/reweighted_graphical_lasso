@@ -7,7 +7,7 @@ This code is a fork of https://github.com/Perceptronium/benchmark_graphical_lass
 
 This repository runs three solvers to solve the non-convex Graphical Lasso estimator (Banerjee et al., 2008):
 
-$$\\min_{\\Theta \\succ 0} - \\log \\det (\\Theta) + \\langle \\Theta, S \\rangle + \\alpha \\sum_{i,j=1}^d \\phi_{i,j}(|[\\Theta}]^{(i,j)}|),$$
+$$\\min_{\\Theta \\succ 0} - \\log \\det (\\Theta) + \\langle \\Theta, S \\rangle + \\alpha \\sum_{i,j=1}^d \\phi_{i,j}(\\|[\\Theta}]^{(i,j)}\\|),$$
 
 where $\\Theta$ is the optimization variable, $S$ is the empirical covariance matrix, $\\alpha$ is the regularization hyperparameter and $\\phi_{i,j}$ encodes a block-wise non-convex penalty.
 
